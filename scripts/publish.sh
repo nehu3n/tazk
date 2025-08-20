@@ -66,7 +66,7 @@ rm package.json.bak
 
 # Commit version changes
 echo "📝 Committing version changes..."
-git add Cargo.toml package.json
+git add Cargo.toml Cargo.lock package.json
 git commit -m "chore: bump version to $VERSION"
 
 # Create and push tag
