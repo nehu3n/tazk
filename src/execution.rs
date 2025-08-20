@@ -1,5 +1,8 @@
 use crate::format::Task;
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    process::{Command, exit},
+};
 
 pub fn topological_order(tasks: &HashMap<String, Task>) -> Vec<String> {
     // dep -> task
@@ -35,4 +38,49 @@ pub fn topological_order(tasks: &HashMap<String, Task>) -> Vec<String> {
     }
 
     result
+}
+
+pub fn collect_dependencies(tasks: &HashMap<String, Task>, start: &str) -> HashSet<String> {
+    let mut visited = HashSet::new();
+
+    fn dfs(task: &str, tasks: &HashMap<String, Task>, visited: &mut HashSet<String>) {
+        if !visited.insert(task.to_string()) {
+            return;
+        }
+        if let Some(t) = tasks.get(task) {
+            for dep in &t.deps {
+                dfs(dep, tasks, visited);
+            }
+        }
+    }
+
+    dfs(start, tasks, &mut visited);
+    visited
+}
+
+pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str) {
+    let deps = collect_dependencies(tasks, start);
+    let order = topological_order(tasks);
+
+    let filtered: Vec<String> = order.into_iter().filter(|t| deps.contains(t)).collect();
+
+    for task_name in filtered {
+        if let Some(task) = tasks.get(&task_name) {
+            println!("🐕 running task: {task_name}");
+            run_task(&task_name, task);
+        }
+    }
+}
+
+fn run_task(task_name: &String, task: &Task) {
+    let mut parts = task.cmd.split_whitespace();
+    let cmd = parts.next().unwrap();
+    let args: Vec<&str> = parts.collect();
+
+    let status = Command::new(cmd).args(args).status().expect("command execution failed");
+
+    if !status.success() {
+        eprintln!("task '{task_name}' failed.");
+        exit(1);
+    }
 }

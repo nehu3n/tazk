@@ -7,7 +7,7 @@ use std::{path::PathBuf, process::exit};
 use clap::Parser;
 
 use crate::{
-    execution::topological_order,
+    execution::run_from_task,
     format::TasksFile,
     tasks_file::{ValidationError, detect_tasks_file, parse_tasks_file, validate_tasks_file},
 };
@@ -91,13 +91,5 @@ fn main() {
     }
 
     let task_name = cli.task.clone().unwrap_or_default();
-    let task = file_parsed.tasks.get(&task_name);
-    if task.is_some() {
-        let order = topological_order(&file_parsed.tasks);
-
-        println!("execution order: {order:?}");
-    } else {
-        eprintln!("error: task '{task_name}' not found.");
-        exit(1);
-    }
+    run_from_task(&file_parsed.tasks, &task_name);
 }
