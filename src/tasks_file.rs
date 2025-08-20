@@ -1,5 +1,6 @@
 use crate::format::TasksFile;
 use std::{
+    collections::HashSet,
     fs::read_to_string,
     path::{Path, PathBuf},
     process::exit,
@@ -52,4 +53,49 @@ pub fn parse_tasks_file(path: PathBuf) -> TasksFile {
             exit(1);
         }
     }
+}
+
+#[derive(Debug)]
+pub enum ValidationError {
+    DuplicatedTask(String),
+    DependencyNotFound { task: String, dep: String },
+    EmptyCommand(String),
+    SelfDependency(String),
+}
+
+pub fn validate_tasks_file(file: TasksFile) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+
+    let mut seen = HashSet::new();
+    for name in file.tasks.keys() {
+        if !seen.insert(name.clone()) {
+            errors.push(ValidationError::DuplicatedTask(name.clone()));
+        }
+    }
+
+    let task_names: HashSet<_> = file.tasks.keys().map(|name| name.as_str()).collect();
+    for (name, task) in &file.tasks {
+        for dep in &task.deps {
+            if !task_names.contains(dep.as_str()) {
+                errors.push(ValidationError::DependencyNotFound {
+                    task: name.clone(),
+                    dep: dep.clone(),
+                });
+            }
+        }
+    }
+
+    for (name, task) in &file.tasks {
+        if task.cmd.trim().is_empty() {
+            errors.push(ValidationError::EmptyCommand(name.clone()));
+        }
+    }
+
+    for (name, task) in &file.tasks {
+        if task.deps.contains(name) {
+            errors.push(ValidationError::SelfDependency(name.clone()));
+        }
+    }
+
+    errors
 }

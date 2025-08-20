@@ -7,7 +7,7 @@ use clap::Parser;
 
 use crate::{
     format::TasksFile,
-    tasks_file::{detect_tasks_file, parse_tasks_file},
+    tasks_file::{ValidationError, detect_tasks_file, parse_tasks_file, validate_tasks_file},
 };
 
 #[derive(Parser)]
@@ -47,4 +47,27 @@ fn main() {
 
     let file_parsed: TasksFile = parse_tasks_file(tasks_file);
     println!("parsed tasks file: {file_parsed:?}");
+
+    let errors = validate_tasks_file(file_parsed);
+
+    if !errors.is_empty() {
+        eprintln!("validation errors found:");
+        for error in errors {
+            match error {
+                ValidationError::DuplicatedTask(name) => {
+                    eprintln!(" - duplicated task name: {name}");
+                }
+                ValidationError::DependencyNotFound { task, dep } => {
+                    eprintln!(" - task '{task}' has a missing dependency: '{dep}'");
+                }
+                ValidationError::EmptyCommand(name) => {
+                    eprintln!(" - task '{name}' has an empty command.");
+                }
+                ValidationError::SelfDependency(name) => {
+                    eprintln!(" - task '{name}' has a self-dependency.");
+                }
+            }
+        }
+        exit(1);
+    }
 }
