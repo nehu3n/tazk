@@ -1,8 +1,13 @@
 mod format;
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs::read_to_string,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
+
+use crate::format::TasksFile;
 
 #[derive(Parser)]
 #[command(name = "Tazk")]
@@ -37,7 +42,10 @@ fn main() {
         }),
     };
 
-    println!("{}", tasks_file.display());
+    println!("file path: {}", tasks_file.display());
+
+    let file_parsed: TasksFile = parse_tasks_file(tasks_file);
+    println!("parsed tasks file: {file_parsed:?}");
 }
 
 fn detect_tasks_file() -> Result<PathBuf, String> {
@@ -52,4 +60,39 @@ fn detect_tasks_file() -> Result<PathBuf, String> {
     }
 
     Err("no compatible file was found (tasks.toml, tasks.yaml, tasks.yml, tasks.json).".to_string())
+}
+
+fn parse_tasks_file(path: PathBuf) -> TasksFile {
+    let content = read_to_string(&path).unwrap();
+
+    match path.extension().and_then(|s| s.to_str()) {
+        Some("toml") => {
+            let parsed: TasksFile = toml::from_str(&content).unwrap_or_else(|err| {
+                eprintln!("error parsing toml file: {err}");
+                std::process::exit(1);
+            });
+
+            parsed
+        }
+        Some("yaml") | Some("yml") => {
+            let parsed: TasksFile = serde_yaml::from_str(&content).unwrap_or_else(|err| {
+                eprintln!("error parsing yaml file: {err}");
+                std::process::exit(1);
+            });
+
+            parsed
+        }
+        Some("json") => {
+            let parsed: TasksFile = serde_json::from_str(&content).unwrap_or_else(|err| {
+                eprintln!("error parsing json file: {err}");
+                std::process::exit(1);
+            });
+
+            parsed
+        }
+        _ => {
+            eprintln!("unsupported file format.");
+            std::process::exit(1);
+        }
+    }
 }
