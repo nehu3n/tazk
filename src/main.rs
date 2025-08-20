@@ -48,7 +48,7 @@ fn main() {
     let file_parsed: TasksFile = parse_tasks_file(tasks_file);
     println!("parsed tasks file: {file_parsed:?}");
 
-    let errors = validate_tasks_file(file_parsed);
+    let errors = validate_tasks_file(file_parsed.clone());
 
     if !errors.is_empty() {
         eprintln!("validation errors found:");
@@ -72,5 +72,20 @@ fn main() {
             }
         }
         exit(1);
+    }
+
+    if cli.list {
+        println!("available tasks:");
+        for (name, task) in file_parsed.tasks {
+            println!(
+                " - {name}{}",
+                if let Some(desc) = task.description {
+                    format!(": {desc}")
+                } else {
+                    "".to_string()
+                }
+            );
+        }
+        exit(0);
     }
 }
