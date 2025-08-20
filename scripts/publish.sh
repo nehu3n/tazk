@@ -27,7 +27,18 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
-if ! git diff-index --quiet HEAD --; then
+if [ -n "$BASH_VERSION" ] || [ -n "$ZSH_VERSION" ]; then
+    git diff-index --quiet HEAD --
+    STATUS=$?
+elif [ -n "$FISH_VERSION" ]; then
+    git diff-index --quiet HEAD --
+    STATUS=$status
+else
+    git diff-index --quiet HEAD --
+    STATUS=$?
+fi
+
+if [ $STATUS -ne 0 ]; then
     echo "❌ You have uncommitted changes. Please commit or stash them first."
     exit 1
 fi
