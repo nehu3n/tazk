@@ -1,3 +1,4 @@
+mod execution;
 mod format;
 mod tasks_file;
 
@@ -6,6 +7,7 @@ use std::{path::PathBuf, process::exit};
 use clap::Parser;
 
 use crate::{
+    execution::topological_order,
     format::TasksFile,
     tasks_file::{ValidationError, detect_tasks_file, parse_tasks_file, validate_tasks_file},
 };
@@ -46,7 +48,6 @@ fn main() {
     println!("file path: {}", tasks_file.display());
 
     let file_parsed: TasksFile = parse_tasks_file(tasks_file);
-    println!("parsed tasks file: {file_parsed:?}");
 
     let errors = validate_tasks_file(file_parsed.clone());
 
@@ -87,5 +88,16 @@ fn main() {
             );
         }
         exit(0);
+    }
+
+    let task_name = cli.task.clone().unwrap_or_default();
+    let task = file_parsed.tasks.get(&task_name);
+    if task.is_some() {
+        let order = topological_order(&file_parsed.tasks);
+
+        println!("execution order: {order:?}");
+    } else {
+        eprintln!("error: task '{task_name}' not found.");
+        exit(1);
     }
 }
