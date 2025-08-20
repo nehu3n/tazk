@@ -21,9 +21,10 @@ pub struct Task {
     #[serde(default)]
     pub watch: Vec<String>,
 
+    /*
     #[serde(default)]
     pub cache: bool,
-
+    */
     #[serde(default = "default_debounce")]
     pub watch_debounce: u64,
 
