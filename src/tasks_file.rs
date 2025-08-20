@@ -1,4 +1,4 @@
-use crate::format::{Task, TasksFile};
+use crate::format::{CommandSpec, Task, TasksFile};
 use std::{
     collections::{HashMap, HashSet},
     fs::read_to_string,
@@ -87,7 +87,14 @@ pub fn validate_tasks_file(file: TasksFile) -> Vec<ValidationError> {
     }
 
     for (name, task) in &file.tasks {
-        if task.cmd.trim().is_empty() {
+        let empty = match &task.cmd {
+            CommandSpec::Single(s) => s.trim().is_empty(),
+            CommandSpec::Multiple(cmds) => {
+                cmds.is_empty() || cmds.iter().any(|c| c.trim().is_empty())
+            }
+        };
+
+        if empty {
             errors.push(ValidationError::EmptyCommand(name.clone()));
         }
     }

@@ -1,4 +1,4 @@
-use crate::format::Task;
+use crate::format::{CommandSpec, Task};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     process::{Command, exit},
@@ -73,14 +73,21 @@ pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str) {
 }
 
 fn run_task(task_name: &String, task: &Task) {
-    let mut parts = task.cmd.split_whitespace();
-    let cmd = parts.next().unwrap();
-    let args: Vec<&str> = parts.collect();
+    let commands = match &task.cmd {
+        CommandSpec::Single(s) => vec![s.clone()],
+        CommandSpec::Multiple(list) => list.clone(),
+    };
 
-    let status = Command::new(cmd).args(args).status().expect("command execution failed");
+    for cmd_str in commands {
+        let mut parts = cmd_str.split_whitespace();
+        let cmd = parts.next().unwrap();
+        let args: Vec<&str> = parts.collect();
 
-    if !status.success() {
-        eprintln!("task '{task_name}' failed.");
-        exit(1);
+        let status = Command::new(cmd).args(args).status().expect("command execution failed");
+
+        if !status.success() {
+            eprintln!("task '{task_name}' failed on: {cmd_str}");
+            exit(1);
+        }
     }
 }

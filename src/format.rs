@@ -2,8 +2,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum CommandSpec {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Task {
-    pub cmd: String,
+    pub cmd: CommandSpec,
 
     #[serde(default)]
     pub description: Option<String>,
