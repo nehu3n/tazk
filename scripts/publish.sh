@@ -34,42 +34,26 @@ fi
 
 echo "🧪 Running tests..."
 cargo test
-if [ $? -ne 0 ]; then
-    echo "❌ Tests failed. Please fix them before publishing."
-    exit 1
-fi
 
 echo "📎 Running clippy..."
 cargo clippy -- -D warnings
-if [ $? -ne 0 ]; then
-    echo "❌ Clippy checks failed. Please fix them before publishing."
-    exit 1
-fi
 
 echo "✨ Checking formatting..."
 cargo fmt --check
-if [ $? -ne 0 ]; then
-    echo "❌ Code formatting issues found. Run 'cargo fmt' to fix them."
-    exit 1
-fi
 
 echo "✅ All checks passed!"
 echo ""
 
 echo "📝 Updating Cargo.toml version..."
-sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
-rm Cargo.toml.bak
+sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
 
 echo "📝 Updating package.json version..."
-sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
-rm package.json.bak
+sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
 
-# Commit version changes
 echo "📝 Committing version changes..."
 git add Cargo.toml Cargo.lock package.json
 git commit -m "chore: bump version to $VERSION"
 
-# Create and push tag
 echo "🏷️  Creating git tag..."
 git tag "v$VERSION"
 git push origin main
@@ -84,7 +68,6 @@ echo "   - Build binaries for all platforms"
 echo "   - Create a GitHub release"
 echo "   - Publish to crates.io"
 echo "   - Publish to npm"
-echo ""
 echo ""
 echo "3. 📊 Monitor the release:"
 echo "   - GitHub Actions: https://github.com/nehu3n/tazk/actions"
