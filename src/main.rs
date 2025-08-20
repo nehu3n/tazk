@@ -80,11 +80,7 @@ fn main() {
         for (name, task) in file_parsed.tasks {
             println!(
                 " - {name}{}",
-                if let Some(desc) = task.description {
-                    format!(": {desc}")
-                } else {
-                    "".to_string()
-                }
+                if let Some(desc) = task.desc { format!(": {desc}") } else { "".to_string() }
             );
         }
         exit(0);

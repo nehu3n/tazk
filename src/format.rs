@@ -13,7 +13,7 @@ pub struct Task {
     pub cmd: CommandSpec,
 
     #[serde(default)]
-    pub description: Option<String>,
+    pub desc: Option<String>,
 
     #[serde(default)]
     pub deps: Vec<String>,
