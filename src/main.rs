@@ -1,6 +1,7 @@
 mod execution;
 mod format;
 mod tasks_file;
+mod watch;
 
 use std::{path::PathBuf, process::exit};
 

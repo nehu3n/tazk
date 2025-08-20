@@ -1,8 +1,13 @@
-use crate::format::{CommandSpec, Task};
+use crate::{
+    format::{CommandSpec, Task},
+    watch::watch_task,
+};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     process::{Command, exit},
+    sync::Arc,
     thread,
+    time::Duration,
 };
 
 pub fn topological_order(tasks: &HashMap<String, Task>) -> Vec<String> {
@@ -59,16 +64,69 @@ pub fn collect_dependencies(tasks: &HashMap<String, Task>, start: &str) -> HashS
     visited
 }
 
+fn collect_dependents(tasks: &HashMap<String, Task>, changed: &str) -> HashSet<String> {
+    let mut dependents = HashSet::new();
+
+    for (name, task) in tasks {
+        if task.deps.contains(&changed.to_string()) {
+            dependents.insert(name.clone());
+            dependents.extend(collect_dependents(tasks, name));
+        }
+    }
+
+    dependents
+}
+
 pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str, concurrent_global: bool) {
     let deps = collect_dependencies(tasks, start);
     let order = topological_order(tasks);
-
     let filtered: Vec<String> = order.into_iter().filter(|t| deps.contains(t)).collect();
+
+    let mut has_watchers = false;
+    let tasks_arc = Arc::new(tasks.clone());
 
     for task_name in filtered {
         if let Some(task) = tasks.get(&task_name) {
             println!("🐕 running task: {task_name}");
+
+            if !task.watch.is_empty() {
+                has_watchers = true;
+
+                let task_name_clone = task_name.clone();
+                let task_clone = task.clone();
+                let tasks_clone = tasks_arc.clone();
+                let concurrent_global_clone = concurrent_global;
+
+                let watch = task_clone.watch.clone();
+                let watch_debounce = task_clone.watch_debounce;
+                let watch_propagate = task_clone.watch_propagate;
+                let task_for_run = task_clone.clone();
+
+                thread::spawn(move || {
+                    watch_task(&watch, watch_debounce, move || {
+                        println!("file change detected for task: {task_name_clone}");
+                        run_task(&task_name_clone, &task_for_run, concurrent_global_clone);
+
+                        if watch_propagate {
+                            let dependents = collect_dependents(&tasks_clone, &task_name_clone);
+                            for dep_name in dependents {
+                                if let Some(dep_task) = tasks_clone.get(&dep_name) {
+                                    run_task(&dep_name, dep_task, concurrent_global_clone);
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+
             run_task(&task_name, task, concurrent_global);
+        }
+    }
+
+    if has_watchers {
+        println!("waiting for file changes...");
+        loop {
+            thread::sleep(Duration::from_secs(1));
         }
     }
 }
