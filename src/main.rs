@@ -1,23 +1,19 @@
 mod format;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 #[derive(Parser)]
 #[command(name = "Tazk")]
 #[command(version = "0.1.0")]
 #[command(about = "🐕 Lightweight, agnostic, fast and easy task runner.", long_about = None)]
 struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
+    task: Option<String>,
 
-#[derive(Subcommand)]
-enum Commands {
-    Run {
-        #[arg()]
-        name: String,
-    },
-    List {},
+    #[arg(long, short)]
+    file: Option<String>,
+
+    #[arg(long, short)]
+    list: bool,
 }
 
 fn main() {
