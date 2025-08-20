@@ -15,7 +15,7 @@ use std::{path::PathBuf, process::exit};
 
 #[derive(Parser)]
 #[command(name = "Tazk")]
-#[command(version = "0.1.0")]
+#[command(version = "0.2.2")]
 #[command(about = "🐕 Lightweight, agnostic, fast and easy task runner.", long_about = None)]
 struct Cli {
     task: Option<String>,
