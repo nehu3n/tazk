@@ -32,14 +32,29 @@ pub struct Task {
 
     #[serde(default)]
     pub env: HashMap<String, String>,
+
+    #[serde(default)]
+    pub concurrent: Option<bool>,
 }
 
 fn default_debounce() -> u64 {
     500
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct Config {
+    #[serde(default)]
+    pub default: Option<String>,
+
+    #[serde(default)]
+    pub concurrent: bool,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TasksFile {
+    #[serde(default)]
+    pub config: Config,
+
     #[serde(default)]
     pub tasks: HashMap<String, Task>,
 }

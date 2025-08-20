@@ -48,6 +48,7 @@ fn main() {
     println!("file path: {}", tasks_file.display());
 
     let file_parsed: TasksFile = parse_tasks_file(tasks_file);
+    let concurrent_global = file_parsed.config.concurrent;
 
     let errors = validate_tasks_file(file_parsed.clone());
 
@@ -86,6 +87,6 @@ fn main() {
         exit(0);
     }
 
-    let task_name = cli.task.clone().unwrap_or_default();
-    run_from_task(&file_parsed.tasks, &task_name);
+    let task_name = cli.task.clone().or(file_parsed.config.default.clone()).unwrap_or_default();
+    run_from_task(&file_parsed.tasks, &task_name, concurrent_global);
 }

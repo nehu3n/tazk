@@ -2,6 +2,7 @@ use crate::format::{CommandSpec, Task};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     process::{Command, exit},
+    thread,
 };
 
 pub fn topological_order(tasks: &HashMap<String, Task>) -> Vec<String> {
@@ -58,7 +59,7 @@ pub fn collect_dependencies(tasks: &HashMap<String, Task>, start: &str) -> HashS
     visited
 }
 
-pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str) {
+pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str, concurrent_global: bool) {
     let deps = collect_dependencies(tasks, start);
     let order = topological_order(tasks);
 
@@ -67,27 +68,51 @@ pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str) {
     for task_name in filtered {
         if let Some(task) = tasks.get(&task_name) {
             println!("🐕 running task: {task_name}");
-            run_task(&task_name, task);
+            run_task(&task_name, task, concurrent_global);
         }
     }
 }
 
-fn run_task(task_name: &String, task: &Task) {
+fn run_task(task_name: &String, task: &Task, concurrent_global: bool) {
     let commands = match &task.cmd {
         CommandSpec::Single(s) => vec![s.clone()],
         CommandSpec::Multiple(list) => list.clone(),
     };
 
-    for cmd_str in commands {
-        let mut parts = cmd_str.split_whitespace();
-        let cmd = parts.next().unwrap();
-        let args: Vec<&str> = parts.collect();
+    let concurrent = task.concurrent.unwrap_or(concurrent_global);
 
-        let status = Command::new(cmd).args(args).status().expect("command execution failed");
+    if concurrent {
+        let handles: Vec<_> = commands
+            .into_iter()
+            .map(|cmd_str| {
+                let task_name = task_name.to_owned();
+                thread::spawn(move || {
+                    execute_command(&task_name, &cmd_str);
+                })
+            })
+            .collect();
 
-        if !status.success() {
-            eprintln!("task '{task_name}' failed on: {cmd_str}");
-            exit(1);
+        for handle in handles {
+            handle.join().unwrap();
         }
+    } else {
+        for cmd_str in commands {
+            execute_command(task_name, &cmd_str);
+        }
+    }
+}
+
+fn execute_command(task_name: &str, cmd_str: &str) {
+    let mut parts = cmd_str.split_whitespace();
+    let cmd = parts.next().unwrap();
+    let args: Vec<&str> = parts.collect();
+
+    println!("   ➜ running: {cmd_str}");
+
+    let status = Command::new(cmd).args(args).status().expect("command execution failed");
+
+    if !status.success() {
+        eprintln!("task '{task_name}' failed on: {cmd_str}");
+        exit(1);
     }
 }
