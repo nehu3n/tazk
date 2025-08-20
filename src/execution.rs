@@ -86,8 +86,9 @@ fn run_task(task_name: &String, task: &Task, concurrent_global: bool) {
             .into_iter()
             .map(|cmd_str| {
                 let task_name = task_name.to_owned();
+                let env = task.env.clone();
                 thread::spawn(move || {
-                    execute_command(&task_name, &cmd_str);
+                    execute_command(&task_name, &cmd_str, &env);
                 })
             })
             .collect();
@@ -97,19 +98,34 @@ fn run_task(task_name: &String, task: &Task, concurrent_global: bool) {
         }
     } else {
         for cmd_str in commands {
-            execute_command(task_name, &cmd_str);
+            execute_command(task_name, &cmd_str, &task.env);
         }
     }
 }
 
-fn execute_command(task_name: &str, cmd_str: &str) {
-    let mut parts = cmd_str.split_whitespace();
-    let cmd = parts.next().unwrap();
-    let args: Vec<&str> = parts.collect();
+fn execute_command(task_name: &str, cmd_str: &str, env: &HashMap<String, String>) {
+    #[cfg(unix)]
+    let mut command = Command::new("sh");
+
+    #[cfg(windows)]
+    let mut command = Command::new("cmd");
+
+    #[cfg(unix)]
+    {
+        command.arg("-c").arg(cmd_str);
+    }
+
+    #[cfg(windows)]
+    {
+        command.arg("/C").arg(cmd_str);
+    }
+
+    for (k, v) in env {
+        command.env(k, v);
+    }
 
     println!("   ➜ running: {cmd_str}");
-
-    let status = Command::new(cmd).args(args).status().expect("command execution failed");
+    let status = command.status().expect("command execution failed");
 
     if !status.success() {
         eprintln!("task '{task_name}' failed on: {cmd_str}");
