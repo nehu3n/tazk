@@ -1,0 +1,10 @@
+[package]
+name = "tazk"
+version = "0.1.0"
+edition = "2024"
+authors = ["Nehuén <github.com/nehu3n>"]
+description = "🐕 Lightweight, agnostic, fast and easy task runner"
+license = "MIT"
+repository = "https://github.com/nehu3n/tazk"
+
+[dependencies]

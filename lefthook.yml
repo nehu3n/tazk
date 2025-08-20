@@ -1,0 +1,207 @@
+skip_output:
+  - meta
+  - summary
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt-check:
+      tags: rust formatter
+      run: cargo fmt --all -- --check
+      fail_text: "Code is not formatted. Run 'cargo fmt' to fix."
+
+    clippy:
+      tags: rust linter
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      fail_text: "Linting failed. Fix clippy warnings."
+
+    check:
+      tags: rust compile
+      run: cargo check --all-targets --all-features
+      fail_text: "Code doesn't compile. Fix compilation errors."
+
+pre-push:
+  parallel: false
+  commands:
+    test:
+      tags: rust test
+      run: cargo test --all-features
+      fail_text: "Tests failed. Fix failing tests before pushing."
+      
+    audit:
+      tags: rust security
+      run: cargo audit
+      fail_text: "Security vulnerabilities found. Run 'cargo audit fix' or update dependencies."
+      skip:
+        - merge
+        - rebase
+
+prepare-commit-msg:
+  commands:
+    conventional-commits-prepare:
+      tags: commit-msg
+      run: |
+        # This hook runs before the commit message is created
+        # We can use it to prepare or validate the template
+        echo "📝 Preparing commit message validation..."
+        echo "Remember to use Conventional Commits format: <type>[optional scope]: <description>"
+
+commit-msg:
+  commands:
+    conventional-commits:
+      tags: commit-msg
+      run: |
+        # Detect OS
+        is_windows=false
+        if [[ "$OSTYPE" == "msys"* ]] || [[ "$OSTYPE" == "win32" ]] || [[ "$OS" == "Windows_NT" ]]; then
+          is_windows=true
+        fi
+
+        if $is_windows; then
+          # Windows - get commit message from git or Lefthook env
+          commit_msg=$(git log --format=%B -n 1 HEAD 2>/dev/null || echo "")
+          if [ -z "$commit_msg" ]; then
+            commit_msg="$LEFTHOOK_COMMIT_MSG"
+          fi
+
+          # Escape single quotes for Powershell safely
+          commit_msg_escaped=${commit_msg//\'/\'\'}
+
+          powershell -Command "
+            \$commitMsg = '$commit_msg_escaped'.Trim()
+            if (\$commitMsg -eq '') {
+              Write-Host '⚠️  Empty commit message, skipping validation'
+              exit 0
+            }
+
+            # Begin your original Write-Host checks (unchanged)
+            \$pattern = '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.+\))?: .{1,50}'
+            if (\$commitMsg -notmatch \$pattern) {
+              Write-Host '❌ Invalid commit message format!'
+              Write-Host 'Format: <type>[optional scope]: <description>'
+              Write-Host 'Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test'
+              Write-Host 'Example: feat(auth): add login functionality'
+              Write-Host 'Your message: ' + \$commitMsg
+              exit 1
+            }
+
+            if (\$commitMsg.Length -gt 72) {
+              Write-Host '❌ Commit message too long! Keep it under 72 characters.'
+              Write-Host 'Current length: ' + \$commitMsg.Length
+              Write-Host 'Your message: ' + \$commitMsg
+              exit 1
+            }
+
+            \$description = \$commitMsg -replace '^[a-z]+(\([^)]+\))?: ', ''
+            if (\$description -match '^(added|fixed|updated|changed|removed|created)') {
+              Write-Host '⚠️  Use imperative mood: add not added, fix not fixed'
+              Write-Host 'Example: feat: add user authentication not feat: added user authentication'
+              Write-Host 'Your message: ' + \$commitMsg
+              exit 1
+            }
+
+            Write-Host '✅ Commit message follows Conventional Commits specification'
+          "
+        else
+          # Unix-like systems (macOS, Linux)
+          # Try multiple ways to get the commit message
+          commit_msg=""
+          
+          # Method 1: Check if we have a file argument (standard git hook behavior)
+          if [ -n "$1" ] && [ -f "$1" ]; then
+            commit_msg=$(cat "$1" | head -1 | tr -d '\n\r')
+          fi
+          
+          # Method 2: Try lefthook environment variables
+          if [ -z "$commit_msg" ] && [ -n "$LEFTHOOK_COMMIT_MSG" ]; then
+            commit_msg="$LEFTHOOK_COMMIT_MSG"
+          fi
+          
+          # Method 3: Check standard git environment variables
+          if [ -z "$commit_msg" ] && [ -n "$GIT_COMMIT_MSG" ]; then
+            commit_msg="$GIT_COMMIT_MSG"
+          fi
+          
+          # Method 4: Read from stdin if available
+          if [ -z "$commit_msg" ] && [ ! -t 0 ]; then
+            commit_msg=$(head -1 | tr -d '\n\r')
+          fi
+          
+          # Method 5: As last resort, try to get from git's internal state
+          # This is a fallback and may not always work
+          if [ -z "$commit_msg" ]; then
+            # Check if there's a COMMIT_EDITMSG file in .git
+            if [ -f ".git/COMMIT_EDITMSG" ]; then
+              commit_msg=$(cat .git/COMMIT_EDITMSG | head -1 | tr -d '\n\r')
+            fi
+          fi
+          
+          # Skip if commit message is empty or starts with #
+          if [ -z "$commit_msg" ] || [[ "$commit_msg" =~ ^#.* ]]; then
+            echo "⚠️  Empty commit message or comment, skipping validation"
+            exit 0
+          fi
+
+          # Validate Conventional Commit format
+          if ! echo "$commit_msg" | grep -qE '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.+\))?: .{1,50}'; then
+            echo "❌ Invalid commit message format!"
+            echo "Format: <type>[optional scope]: <description>"
+            echo "Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test"
+            echo "Example: feat(auth): add login functionality"
+            echo "Your message: \"$commit_msg\""
+            exit 1
+          fi
+
+          # Length check
+          if [ ${#commit_msg} -gt 72 ]; then
+            echo "❌ Commit message too long! Keep it under 72 characters."
+            echo "Current length: ${#commit_msg}"
+            echo "Your message: \"$commit_msg\""
+            exit 1
+          fi
+
+          # Imperative mood check
+          description=$(echo "$commit_msg" | sed -E 's/^[a-z]+(\([^)]+\))?: //')
+          if echo "$description" | grep -qE '^(added|fixed|updated|changed|removed|created)'; then
+            echo "⚠️  Use imperative mood: 'add' not 'added', 'fix' not 'fixed'"
+            echo "Example: 'feat: add user authentication' not 'feat: added user authentication'"
+            echo "Your message: \"$commit_msg\""
+            exit 1
+          fi
+
+          echo "✅ Commit message follows Conventional Commits specification"
+        fi
+      fail_text: "Commit message doesn't follow Conventional Commits specification."
+
+post-checkout:
+  commands:
+    cargo-update:
+      tags: rust dependencies
+      files: git diff --name-only HEAD@{1} HEAD
+      glob: "{Cargo.toml,Cargo.lock}"
+      run: |
+        echo "🔄 Cargo files changed, updating dependencies..."
+        cargo check
+      skip:
+        - merge
+        - rebase
+
+post-merge:
+  commands:
+    cargo-check:
+      tags: rust post-merge
+      run: |
+        echo "🔄 Running cargo check after merge..."
+        cargo check
+        echo "✅ Dependencies updated successfully"
+
+colors: true
+no_tty: false
+source_dir: ".lefthook"
+source_dir_local: ".lefthook-local"
+
+output:
+  - execution
+  - execution_out
+  - execution_info
+  - skips
