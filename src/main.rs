@@ -66,6 +66,9 @@ fn main() {
                 ValidationError::SelfDependency(name) => {
                     eprintln!(" - task '{name}' has a self-dependency.");
                 }
+                ValidationError::CyclicDependency { cycle } => {
+                    eprintln!(" - cyclic dependency detected: {}", cycle.join(" -> "));
+                }
             }
         }
         exit(1);

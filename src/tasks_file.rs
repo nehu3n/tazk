@@ -1,6 +1,6 @@
-use crate::format::TasksFile;
+use crate::format::{Task, TasksFile};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs::read_to_string,
     path::{Path, PathBuf},
     process::exit,
@@ -61,6 +61,7 @@ pub enum ValidationError {
     DependencyNotFound { task: String, dep: String },
     EmptyCommand(String),
     SelfDependency(String),
+    CyclicDependency { cycle: Vec<String> },
 }
 
 pub fn validate_tasks_file(file: TasksFile) -> Vec<ValidationError> {
@@ -97,5 +98,56 @@ pub fn validate_tasks_file(file: TasksFile) -> Vec<ValidationError> {
         }
     }
 
+    let cycles = detect_cycles(&file.tasks);
+    for cycle in cycles {
+        errors.push(ValidationError::CyclicDependency { cycle });
+    }
+
     errors
+}
+
+fn detect_cycles(tasks: &HashMap<String, Task>) -> Vec<Vec<String>> {
+    let mut cycles = Vec::new();
+    let mut visiting = HashSet::new();
+    let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+
+    fn dfs<'a>(
+        task: &'a str,
+        tasks: &'a HashMap<String, Task>,
+        visiting: &mut HashSet<&'a str>,
+        visited: &mut HashSet<&'a str>,
+        stack: &mut Vec<&'a str>,
+        cycles: &mut Vec<Vec<String>>,
+    ) {
+        if visiting.contains(task) {
+            let cycle_start = stack.iter().position(|&t| t == task).unwrap();
+            let cycle: Vec<String> = stack[cycle_start..].iter().map(|t| t.to_string()).collect();
+            cycles.push(cycle);
+            return;
+        }
+
+        if visited.contains(task) {
+            return;
+        }
+
+        visiting.insert(task);
+        stack.push(task);
+
+        if let Some(t) = tasks.get(task) {
+            for dep in &t.deps {
+                dfs(dep, tasks, visiting, visited, stack, cycles);
+            }
+        }
+
+        stack.pop();
+        visiting.remove(task);
+        visited.insert(task);
+    }
+
+    for task in tasks.keys() {
+        dfs(task, tasks, &mut visiting, &mut visited, &mut stack, &mut cycles);
+    }
+
+    cycles
 }
