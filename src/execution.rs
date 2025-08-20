@@ -1,5 +1,6 @@
 use crate::{
     format::{CommandSpec, Task},
+    logger::Logger,
     watch::watch_task,
 };
 use std::{
@@ -87,7 +88,7 @@ pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str, concurrent_glob
 
     for task_name in filtered {
         if let Some(task) = tasks.get(&task_name) {
-            println!("🐕 running task: {task_name}");
+            Logger::task_start(&task_name);
 
             if !task.watch.is_empty() {
                 has_watchers = true;
@@ -104,13 +105,14 @@ pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str, concurrent_glob
 
                 thread::spawn(move || {
                     watch_task(&watch, watch_debounce, move || {
-                        println!("file change detected for task: {task_name_clone}");
+                        Logger::task_start(&format!("♻️  {}", &task_name_clone));
                         run_task(&task_name_clone, &task_for_run, concurrent_global_clone);
 
                         if watch_propagate {
                             let dependents = collect_dependents(&tasks_clone, &task_name_clone);
                             for dep_name in dependents {
                                 if let Some(dep_task) = tasks_clone.get(&dep_name) {
+                                    Logger::dependency_propagated(&dep_name);
                                     run_task(&dep_name, dep_task, concurrent_global_clone);
                                 }
                             }
@@ -124,7 +126,7 @@ pub fn run_from_task(tasks: &HashMap<String, Task>, start: &str, concurrent_glob
     }
 
     if has_watchers {
-        println!("waiting for file changes...");
+        Logger::waiting();
         loop {
             thread::sleep(Duration::from_secs(1));
         }
@@ -182,11 +184,11 @@ fn execute_command(task_name: &str, cmd_str: &str, env: &HashMap<String, String>
         command.env(k, v);
     }
 
-    println!("   ➜ running: {cmd_str}");
+    Logger::command(cmd_str);
     let status = command.status().expect("command execution failed");
 
     if !status.success() {
-        eprintln!("task '{task_name}' failed on: {cmd_str}");
+        Logger::error(&format!("task '{task_name}' failed on: {cmd_str}"));
         exit(1);
     }
 }

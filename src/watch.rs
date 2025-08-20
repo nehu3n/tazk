@@ -1,3 +1,4 @@
+use crate::logger::Logger;
 use glob::Pattern;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
@@ -34,13 +35,13 @@ pub fn watch_task<F: Fn() + Send + Sync + 'static>(
     }
 
     for dir in &watched_dirs {
-        println!("watching directory: {}", dir.display());
+        Logger::watching_dir(&dir.display().to_string());
         watcher
             .watch(dir, RecursiveMode::Recursive)
             .unwrap_or_else(|_| panic!("failed to watch path: {}", dir.display()));
     }
 
-    println!("watching files for changes with patterns: {patterns:?}");
+    Logger::watching_patterns(patterns);
 
     let mut last_event_time = Instant::now();
     let debounce_duration = Duration::from_millis(debounce_ms);
@@ -75,10 +76,9 @@ pub fn watch_task<F: Fn() + Send + Sync + 'static>(
 
                         for pattern in &compiled_patterns {
                             if pattern.matches_path(&relative_path) {
-                                println!(
-                                    "change detected: {} (matched pattern: {})",
-                                    relative_path.display(),
-                                    pattern.as_str()
+                                Logger::file_change(
+                                    &relative_path.display().to_string(),
+                                    pattern.as_str(),
                                 );
                                 should_trigger = true;
                                 break;
@@ -98,10 +98,10 @@ pub fn watch_task<F: Fn() + Send + Sync + 'static>(
                         }
                     }
                 }
-                Err(e) => eprintln!("watch error: {e:?}"),
+                Err(e) => Logger::error(&format!("watch error: {e:?}")),
             },
             Err(e) => {
-                eprintln!("channel error: {e:?}");
+                Logger::error(&format!("channel error: {e:?}"));
                 break;
             }
         }
