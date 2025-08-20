@@ -8,3 +8,4 @@ license = "MIT"
 repository = "https://github.com/nehu3n/tazk"
 
 [dependencies]
+clap = { version = "4.5.45", features = ["derive"] }
