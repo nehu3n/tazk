@@ -14,9 +14,11 @@ use clap::Parser;
 use std::{path::PathBuf, process::exit};
 
 #[derive(Parser)]
-#[command(name = "Tazk")]
-#[command(version = "0.1.0")]
-#[command(about = "🐕 Lightweight, agnostic, fast and easy task runner.", long_about = None)]
+#[command(
+    name = env!("CARGO_PKG_NAME"),
+    version = env!("CARGO_PKG_VERSION"),
+    about = env!("CARGO_PKG_DESCRIPTION")
+)]
 struct Cli {
     task: Option<String>,
 
